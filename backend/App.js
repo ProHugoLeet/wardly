@@ -33,21 +33,21 @@ function def_response(error, data) {
 
 function getEvents() {
 	return db.get('events')
-	.value()
+		.value()
 }
 
 function getEvent(eventId) {
 	return db
-	.get('events')
-	.find({ id: eventId })
-	.value()
+		.get('events')
+		.find({ id: eventId })
+		.value()
 }
 
 function getPlayerList(eventId) {
 	let playerList = db
-	.get('playerlist')
-	.find({ eventId: eventId })
-	.value()
+		.get('playerlist')
+		.find({ eventId: eventId })
+		.value()
 	if (!playerList) {
 		return [];
 	}
@@ -55,16 +55,16 @@ function getPlayerList(eventId) {
 }
 
 // Write defaults to DB if empty
-db.defaults({ events: []})
-  .write()
+db.defaults({ events: [] })
+	.write()
 
 // GET /event
-app.get('/event', function(req, res) {
-	const data = {events: getEvents()}
+app.get('/event', function (req, res) {
+	const data = { events: getEvents() }
 	res.send(def_response(null, data))
 });
 
-app.get('/event/:eventId/details', function(req, res) {
+app.get('/event/:eventId/details', function (req, res) {
 	let eventId = req.params.eventId
 	if (!eventId) {
 		res.send(def_response('missing id'))
@@ -83,7 +83,7 @@ app.get('/event/:eventId/details', function(req, res) {
 });
 
 // TODO WIP
-app.post('/event/:eventId/signup', function(req, res) {
+app.post('/event/:eventId/signup', function (req, res) {
 	// this should be fetched from a session or credentials somehow
 	//let tempvarname = req.query.name
 
@@ -101,7 +101,7 @@ app.post('/event/:eventId/signup', function(req, res) {
 
 });
 
-app.post('/event', function(req, res) {
+app.post('/event', function (req, res) {
 	if (!req.body.name) {
 		res.send(def_response('missing name'))
 		return;
@@ -112,7 +112,7 @@ app.post('/event', function(req, res) {
 	}
 	if (!req.body.date_start) {
 		res.send(def_response('missing date_start'))
-		return; 
+		return;
 	}
 	if (!req.body.date_end) {
 		res.send(def_response('missing date_end'))
@@ -127,18 +127,92 @@ app.post('/event', function(req, res) {
 		date_end: req.body.date_end
 	}
 	db
-	.get('events')
-	.push(event)
-	.write()
-	.id
+		.get('events')
+		.push(event)
+		.write()
+		.id
 
 	console.log('saving event to id:')
 	console.log(newEventId)
-    var name = req.body.name;
-    let eventFromDB = getEvent(newEventId);
-    if (!eventFromDB) {
-    	res.send(def_response('data was accepted, but an error happened when we tried to store it. Many brokend backend :('))
-    	return
-    }
-    res.send(def_response(null, {events: [eventFromDB]}))
+	var name = req.body.name;
+	let eventFromDB = getEvent(newEventId);
+	if (!eventFromDB) {
+		res.send(def_response('data was accepted, but an error happened when we tried to store it. Many brokend backend :('))
+		return
+	}
+	res.send(def_response(null, { events: [eventFromDB] }))
 });
+
+app.post('/event/:eventId/removeEvent', function (req, res) {
+	let eventId = req.params.eventId
+	if (!eventId) {
+		res.send(def_response('missing id'))
+		return;
+	}
+	let event = getEvent(eventId);
+	if (!event) {
+		res.send(def_response('id was sent, but what is?!'))
+		return
+	}
+
+	db
+		.get('events')
+		.remove({ id: eventId })
+		.write()
+
+	console.log('removed event')
+	console.log(event)
+	var name = req.body.name;
+	let eventFromDB = getEvent(eventId);
+	res.send(def_response(null, 'Event ' + eventId + 'was successfully removed'))
+});
+
+
+app.post('/event/:eventId/updateTime', function (req, res) {
+	let eventId = req.params.eventId;
+	var startDate = req.body.date_start;
+	var endDate = req.body.date_end;
+
+	if (!eventId) {
+		res.send(def_response('missing id'))
+		return;
+	}
+	let event = getEvent(eventId);
+	if (!event) {
+		res.send(def_response('id was sent, but what is?!'))
+		return
+	}
+
+	if (!startDate && !endDate) {
+		res.send(def_response('date_start or end_date is mandatory'))
+		return;
+	}
+	if (startDate) {
+		db
+			.get('events')
+			.find({ id: eventId })
+			.assign({ date_start: startDate })
+			.write()
+			.id
+
+		console.log('updated ' + eventId + 'date_start to:' + endDate)
+	}
+	if (endDate) {
+		db
+			.get('events')
+			.find({ id: eventId })
+			.assign({ date_end: endDate })
+			.write()
+			.id
+
+		console.log('updated ' + eventId + 'date_end to:' + endDate)
+	}
+
+	let eventFromDB = getEvent(eventId);
+	if (!eventFromDB) {
+		res.send(def_response('data was accepted, but an error happened when we tried to store it. Many brokend backend :('))
+		return
+	}
+	res.send(def_response(null, { events: [eventFromDB] }))
+});
+
