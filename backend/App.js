@@ -36,6 +36,22 @@ function getEvents() {
 		.value()
 }
 
+function isAdded(eventId, nickname) {
+	//let eventId = eventId
+	let numberOfOccurencesInList = db
+		.get('events')
+		.find({ id: eventId })
+		.pick('playerList')
+		.value()
+	if (numberOfOccurencesInList.playerList.indexOf(nickname) > -1) {
+		return true
+	}
+	else {
+		return false
+	}
+}
+
+
 function getEvent(eventId) {
 	return db
 		.get('events')
@@ -45,13 +61,14 @@ function getEvent(eventId) {
 
 function getPlayerList(eventId) {
 	let playerList = db
-		.get('playerlist')
-		.find({ eventId: eventId })
+		.get('events')
+		.find({ id: eventId })
+		.pick('playerList')
 		.value()
 	if (!playerList) {
 		return [];
 	}
-	return playerList
+	return playerList.playerList
 }
 
 // Write defaults to DB if empty
@@ -75,10 +92,10 @@ app.get('/event/:eventId/details', function (req, res) {
 		res.send(def_response('id was sent, but what is?!'))
 		return
 	}
-	let playerlist = getPlayerList(eventId)
+	let playerList = getPlayerList(eventId)
 	res.send(def_response(null, {
 		events: [event],
-		playerlist: getPlayerList(eventId),
+		playerList: getPlayerList(eventId),
 	}))
 });
 
@@ -118,13 +135,15 @@ app.post('/event', function (req, res) {
 		res.send(def_response('missing date_end'))
 		return;
 	}
+	let newPlayerList = []
 	let newEventId = shortid.generate()
 	let event = {
 		id: newEventId,
 		name: req.body.name,
 		guildid: req.body.guildid,
 		date_start: req.body.date_start,
-		date_end: req.body.date_end
+		date_end: req.body.date_end,
+		playerList: newPlayerList,
 	}
 	db
 		.get('events')
@@ -216,3 +235,46 @@ app.post('/event/:eventId/updateTime', function (req, res) {
 	res.send(def_response(null, { events: [eventFromDB] }))
 });
 
+
+
+app.post('/event/:eventId/add', function (req, res) {
+	let eventId = req.params.eventId
+	let nickname = req.body.nickName
+	if (!eventId) {
+		res.send(def_response('missing id'))
+		return
+	}
+	if (!nickname) {
+		res.send(def_response('missing nickname'))
+		return
+	}
+	let event = getEvent(eventId);
+	if (!event) {
+		res.send(def_response('id was sent, but what is?!'))
+		return
+	}
+
+	if (isAdded(eventId, nickname)) {
+		res.send(def_response('Player is already in list!'))
+		return
+	}
+	//WE DO NOT TRUST FRONTEND.
+
+	let playerList = getPlayerList(eventId)
+	playerList.push(nickname)
+	db
+		.get('events')
+		.find({ id: eventId })
+		.assign({ playerList })
+		.write()
+		.id
+
+	console.log('Updated playerlist:')
+	console.log(playerList)
+	let eventFromDB = getEvent(eventId);
+	if (!eventFromDB) {
+		res.send(def_response('data was accepted, but an error happened when we tried to store it. Many brokend backend :('))
+		return
+	}
+	res.send(def_response(null, { events: [eventFromDB] }))
+});
